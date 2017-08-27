@@ -1,0 +1,33 @@
+﻿{
+  // Each repository is assumed to be in a folder named Name under the RootDirectory.
+  "RootDirectory": "C:\\dev",
+  "Repositories": [
+    {
+      // This repository is built for multiple Platforms.
+      "Name": "Common",
+      "Platforms": [ "x64", "Any CPU" ]
+    },
+    {
+      // If no Platforms are specified, the repository is pulled but not built.
+      "Name": "ThirdPartyLibraries"
+    },
+    {
+      // This will only be built after Common Any CPU is built.
+      "Name": "Website",
+      "Platforms": [ "Any CPU" ],
+      "Dependencies": [ "Common" ]
+    },
+    {
+      // This will only be built after ThirdPartyLibraries is pulled and Common x64 is built.
+      "Name": "Service",
+      "Platforms": [ "x64" ],
+      "Dependencies": [ "Common", "ThirdPartyLibraries" ]
+    },
+    {
+      // This repository sits outside the RootDirectory.
+      "Name": "MyStuff",
+      "Platforms": [ "Any CPU" ],
+      "Directory": "C:\\Users\\Me\\Source\\MyStuff"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.16
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PullAndBuildAll", "PullAndBuildAll\PullAndBuildAll.csproj", "{905B3E82-1CA7-47F7-84F9-0755A58D168C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{905B3E82-1CA7-47F7-84F9-0755A58D168C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{905B3E82-1CA7-47F7-84F9-0755A58D168C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{905B3E82-1CA7-47F7-84F9-0755A58D168C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{905B3E82-1CA7-47F7-84F9-0755A58D168C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
