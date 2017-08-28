@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace PullAndBuildAll
 {
@@ -11,45 +10,29 @@ namespace PullAndBuildAll
     /// The controller for a git pull task.
     /// </summary>
     [System.Diagnostics.DebuggerDisplay("NuGet {HashString}")]
-    public class NuGetController : RepositoryHash, IController
+    public class NuGetController : BaseController<NuGetHash>
     {
         /// <summary>
         /// The task factory used for all tasks of this type.
         /// </summary>
-        private static readonly TaskFactory TaskFactory = new TaskFactory(new LimitedConcurrencyLevelTaskScheduler(1));
+        private static readonly TaskFactory _taskFactory = new TaskFactory(new LimitedConcurrencyLevelTaskScheduler(1));
 
         /// <summary>
         /// The instance used to operate git.
         /// </summary>
-        private readonly NuGetService _nugetService;
-
-        /// <summary>
-        /// The control managing the asynchronous task.
-        /// </summary>
-        public TaskControl Control { get; } = new TaskControl {
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            TaskFactory = TaskFactory,
-        };
-
-        /// <summary>
-        /// The names of the repositories upon which this task is dependent.
-        /// </summary>
-        public RepositoryHash[] DependencyHashes { get; }
-
-        /// <summary>
-        /// The <see cref="Task"/> objects upon which this task is dependant.
-        /// </summary>
-        public TaskControl[] DependencyTaskControls { get; set; }
-
-        /// <summary>
-        /// The total number of tasks depeneant on this task.
-        /// </summary>
-        public int Dependents { get; set; } = 0;
+        private readonly NuGetService NugetService;
 
         /// <summary>
         /// The repository's directory.
         /// </summary>
         public string Directory { get; }
+
+        /// <summary>
+        /// The repository's name.
+        /// </summary>
+        public string Name { get; }
+
+        protected override TaskFactory TaskFactory => _taskFactory;
 
         /// <summary>
         /// Initialises a new instance of the <see cref="PullController"/> class.
@@ -59,37 +42,27 @@ namespace PullAndBuildAll
         /// <param name="name">The repository's name.</param>
         /// <param name="dependencies">The name of repositories this repository is dependant upon.</param>
         public NuGetController(NuGetService nugetService, string directory, string name, string[] dependencies)
-            : base(name)
+            : base(new NuGetHash(name), dependencies)
         {
-            _nugetService = nugetService;
-            DependencyHashes = dependencies
-                .Select(dependency => new RepositoryHash(dependency))
-                .ToArray();
+            NugetService = nugetService;
             Directory = directory;
-
-            Control.Name = $"NuGet_{name}";
+            Name = name;
         }
 
-        /// <summary>
-        /// Schedules the task for execution.
-        /// </summary>
-        public void ScheduleTask() =>
-            Control.ContinueWhenAll(DependencyTaskControls.Select(control => control.Task).ToArray(), ExecuteTask);
-
-        /// <summary>
-        /// Executes the task.
-        /// </summary>
-        /// <param name="tasks">The finished dependency tasks.</param>
-        private void ExecuteTask(Task[] tasks)
+        protected override void ExecuteTask()
         {
-            if (tasks.Any(task => task.IsCanceled || task.IsFaulted))
+            var anyDependencyFailed = DependencyControls
+                .Select(control => control.Task)
+                .Any(task => task.IsCanceled || task.IsFaulted);
+
+            if (anyDependencyFailed)
                 Control.Cancel().ThrowIfCancellationRequested();
 
             var log = new List<string>();
             foreach (var solutionPath in System.IO.Directory.GetFiles(Directory, "*.sln", SearchOption.AllDirectories))
             {
                 Control.CancellationToken.ThrowIfCancellationRequested();
-                log.AddRange(_nugetService.Restore(solutionPath));
+                log.AddRange(NugetService.Restore(solutionPath));
             }
             Control.Log = string.Join(Environment.NewLine, log);
         }

@@ -1,6 +1,6 @@
 ﻿namespace PullAndBuildAll
 {
-    internal interface IHash
+    public interface IHash
     {
 
         string HashString { get; }

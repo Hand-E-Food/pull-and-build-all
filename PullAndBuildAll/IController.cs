@@ -1,16 +1,17 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace PullAndBuildAll
 {
-    internal interface IController : IHash
+    internal interface IController
     {
         TaskControl Control { get; }
 
-        TaskControl[] DependencyTaskControls { get; }
+        TaskControl[] DependencyControls { get; }
 
         int Dependents { get; set; }
 
-        void ScheduleTask();
+        IHash Hash { get; }
+
+        void ScheduleTask(Task[] dependencyTasks = null);
     }
 }

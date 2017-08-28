@@ -63,6 +63,11 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseController.cs" />
+    <Compile Include="BaseHash.cs" />
+    <Compile Include="PullHash.cs" />
+    <Compile Include="NuGetHash.cs" />
+    <Compile Include="BuildHash.cs" />
     <Compile Include="IHash.cs" />
     <Compile Include="LogForm.cs">
       <SubType>Form</SubType>
@@ -71,7 +76,6 @@
       <DependentUpon>LogForm.cs</DependentUpon>
     </Compile>
     <Compile Include="OperationFailedException.cs" />
-    <Compile Include="PlatformHash.cs" />
     <Compile Include="GitService.cs" />
     <Compile Include="IController.cs" />
     <Compile Include="MergeConflictException.cs" />
@@ -80,7 +84,6 @@
     <Compile Include="NuGetService.cs" />
     <Compile Include="NuGetController.cs" />
     <Compile Include="PullController.cs" />
-    <Compile Include="RepositoryHash.cs" />
     <Compile Include="RepositoryConfiguration.cs" />
     <Compile Include="Configuration.cs" />
     <Compile Include="MainForm.cs">

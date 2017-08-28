@@ -9,7 +9,7 @@ namespace PullAndBuildAll
         public IList<string> Log { get; }
 
         public OperationFailedException(List<string> log)
-            :base(string.Join(Environment.NewLine, log))
+            : base(string.Join(Environment.NewLine, log))
         {
             Log = log;
         }

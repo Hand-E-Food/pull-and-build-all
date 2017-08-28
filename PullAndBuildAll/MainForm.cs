@@ -16,23 +16,23 @@ namespace PullAndBuildAll
         private GitService _gitService;
         private NuGetService _nugetService;
         private BuildService _buildService;
-        private Dictionary<RepositoryHash, PullController > _pullControllers  = new Dictionary<RepositoryHash, PullController >();
-        private Dictionary<RepositoryHash, NuGetController> _nugetControllers = new Dictionary<RepositoryHash, NuGetController>();
-        private Dictionary<PlatformHash  , BuildController> _buildControllers = new Dictionary<PlatformHash  , BuildController>();
+        private Dictionary<IHash, PullController > _pullControllers  = new Dictionary<IHash, PullController >();
+        private Dictionary<IHash, NuGetController> _nugetControllers = new Dictionary<IHash, NuGetController>();
+        private Dictionary<IHash, BuildController> _buildControllers = new Dictionary<IHash, BuildController>();
 
-        private IEnumerable<IController> AllControllers
-        {
-            get
-            {
-                return _pullControllers.Values
-                    .Concat<IController>(_nugetControllers.Values)
-                    .Concat(_buildControllers.Values);
-            }
-        }
+        private readonly IEnumerable<IEnumerable<IController>> AllControllerLists;
+
+        private IEnumerable<IController> AllControllers => AllControllerLists.SelectMany(list => list);
 
         public MainForm()
         {
             InitializeComponent();
+
+            AllControllerLists = new IEnumerable<IController>[] {
+                _pullControllers.Values,
+                _nugetControllers.Values,
+                _buildControllers.Values,
+            };
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -63,17 +63,17 @@ namespace PullAndBuildAll
                 var repositoryDirectory = repository.Directory ?? Path.Combine(_configuration.RootDirectory, repository.Name);
 
                 var pullController = new PullController(_gitService, repositoryDirectory, repository.Name, repository.Dependencies);
-                _pullControllers.Add(pullController, pullController);
+                _pullControllers.Add(pullController.Hash, pullController);
 
                 if (repository.Platforms.Length > 0)
                 {
                     var nugetController = new NuGetController(_nugetService, repositoryDirectory, repository.Name, repository.Dependencies);
-                    _nugetControllers.Add(nugetController, nugetController);
+                    _nugetControllers.Add(nugetController.Hash, nugetController);
 
                     foreach (var platform in repository.Platforms)
                     {
                         var buildController = new BuildController(_buildService, repositoryDirectory, repository.Name, platform, repository.Dependencies);
-                        _buildControllers.Add(buildController, buildController);
+                        _buildControllers.Add(buildController.Hash, buildController);
                     }
                 }
             }
@@ -83,28 +83,28 @@ namespace PullAndBuildAll
         {
             foreach (var pullController in _pullControllers.Values)
             {
-                pullController.DependencyTaskControls = pullController.DependencyHashes
-                    .Select(hash => _pullControllers[hash].Control)
+                pullController.DependencyControls = pullController.DependencyNames
+                    .Select(dependency => _pullControllers[new PullHash(dependency)].Control)
                     .ToArray();
             }
 
             foreach (var nugetController in _nugetControllers.Values)
             {
-                nugetController.DependencyTaskControls = new[] { _pullControllers[nugetController].Control };
+                nugetController.DependencyControls = new[] { _pullControllers[new PullHash(nugetController.Name)].Control };
             }
 
             foreach (var buildController in _buildControllers.Values)
             {
-                var dependencyControls = new List<TaskControl> { _nugetControllers[new RepositoryHash(buildController.Name)].Control };
-                foreach (var hash in buildController.DependencyHashes)
+                var dependencyControls = new List<TaskControl> { _nugetControllers[new NuGetHash(buildController.Name)].Control };
+                foreach (var dependency in buildController.DependencyNames)
                 {
-                    if (_buildControllers.TryGetValue(hash, out BuildController controller))
+                    if (_buildControllers.TryGetValue(new BuildHash(dependency, buildController.Platform), out BuildController controller))
                         dependencyControls.Add(controller.Control);
                     else
-                        dependencyControls.Add(_pullControllers[new RepositoryHash(hash.Name)].Control);
+                        dependencyControls.Add(_pullControllers[new PullHash(dependency)].Control);
                 }
 
-                buildController.DependencyTaskControls = dependencyControls.ToArray();
+                buildController.DependencyControls = dependencyControls.ToArray();
             }
         }
 
@@ -115,7 +115,7 @@ namespace PullAndBuildAll
             foreach (var controller in allControllers)
             {
                 var dependencies =
-                    Flatten(controller, x => x.DependencyTaskControls
+                    Flatten(controller, x => x.DependencyControls
                         .Select(dependency => allControllers
                             .First(parent => parent.Control == dependency)
                         )
@@ -156,7 +156,7 @@ namespace PullAndBuildAll
                     outputPanel.SetRowSpan(nameLabel, buildControllers.Count);
                     outputPanel.SetRowSpan(pullController.Control, buildControllers.Count);
 
-                    var nugetController = _nugetControllers[pullController];
+                    var nugetController = _nugetControllers[new NuGetHash(pullController.Name)];
                     outputPanel.Controls.Add(nugetController.Control, 2, rowNumber);
                     outputPanel.SetRowSpan(nugetController.Control, buildControllers.Count);
 
@@ -196,7 +196,7 @@ namespace PullAndBuildAll
         {
             var allControllers = AllControllers
                 .OrderByDescending(controller => controller.Dependents)
-                .ThenBy(controller => controller.HashString)
+                .ThenBy(controller => controller.Hash.HashString)
                 .ToList();
 
             while (true)
@@ -204,13 +204,24 @@ namespace PullAndBuildAll
                 var nextController = allControllers
                     .FirstOrDefault(controller =>
                         controller.Control.Task == null
-                        && controller.DependencyTaskControls.All(control => control.Task != null)
+                        && controller.DependencyControls.All(control => control.Task != null)
                     );
 
                 if (nextController == null)
                     break;
 
-                nextController.ScheduleTask();
+                var dependencyList = AllControllerLists
+                    .First(list => list.Contains(nextController));
+
+                var dependencyControls = dependencyList
+                    .Where(controller => controller.Control.Task != null)
+                    .Select(controller => controller.Control);
+
+                var dependencyTasks = dependencyControls
+                    .Select(control => control.Task)
+                    .ToArray();
+
+                nextController.ScheduleTask(dependencyTasks);
             }
         }
 

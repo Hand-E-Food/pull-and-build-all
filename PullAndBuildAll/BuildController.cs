@@ -2,7 +2,6 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace PullAndBuildAll
 {
@@ -10,12 +9,12 @@ namespace PullAndBuildAll
     /// The controller for a build task.
     /// </summary>
     [System.Diagnostics.DebuggerDisplay("Build {HashString}")]
-    public class BuildController : PlatformHash, IController
+    public class BuildController : BaseController<BuildHash>
     {
         /// <summary>
         /// The task factory used for all tasks of this type.
         /// </summary>
-        private static readonly TaskFactory TaskFactory = new TaskFactory(new LimitedConcurrencyLevelTaskScheduler(1));
+        private static readonly TaskFactory _taskFactory = new TaskFactory(new LimitedConcurrencyLevelTaskScheduler(1));
 
         /// <summary>
         /// The instance used to build code.
@@ -23,33 +22,21 @@ namespace PullAndBuildAll
         private readonly BuildService BuildService;
 
         /// <summary>
-        /// The control managing the asynchronous task.
-        /// </summary>
-        public TaskControl Control { get; } = new TaskControl
-        {
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-            TaskFactory = TaskFactory,
-        };
-
-        /// <summary>
-        /// The names of the repositories and platforms upon which this task is dependent.
-        /// </summary>
-        public PlatformHash[] DependencyHashes { get; }
-
-        /// <summary>
-        /// The <see cref="Task"/> objects upon which this task is dependant.
-        /// </summary>
-        public TaskControl[] DependencyTaskControls { get; set; }
-
-        /// <summary>
-        /// The total number of tasks dependent on this task.
-        /// </summary>
-        public int Dependents { get; set; } = 0;
-
-        /// <summary>
         /// The repository's directory.
         /// </summary>
         public string Directory { get; }
+
+        /// <summary>
+        /// The repository's name.
+        /// </summary>
+        public string Name { get; }
+
+        /// <summary>
+        /// The platform to build against.
+        /// </summary>
+        public string Platform { get; }
+
+        protected override TaskFactory TaskFactory => _taskFactory;
 
         /// <summary>
         /// Initialises a new instance of the <see cref="PullController"/> class.
@@ -60,30 +47,21 @@ namespace PullAndBuildAll
         /// <param name="platform">The platform to build against.</param>
         /// <param name="dependencies">The name of repositories this repository is dependant upon.</param>
         public BuildController(BuildService buildService, string directory, string name, string platform, string[] dependencies)
-            : base(name, platform)
+            : base(new BuildHash(name, platform), dependencies)
         {
             BuildService = buildService;
-            DependencyHashes = dependencies
-                .Select(dependency => new PlatformHash(dependency, platform))
-                .ToArray();
             Directory = directory;
-
-            Control.Name = $"Build_{name}_{platform}";
+            Name = name;
+            Platform = platform;
         }
 
-        /// <summary>
-        /// Schedules the task for execution.
-        /// </summary>
-        public void ScheduleTask() =>
-            Control.ContinueWhenAll(DependencyTaskControls.Select(control => control.Task).ToArray(), ExecuteTask);
-
-        /// <summary>
-        /// Executes the task.
-        /// </summary>
-        /// <param name="tasks">The finished dependency tasks.</param>
-        private void ExecuteTask(Task[] tasks)
+        protected override void ExecuteTask()
         {
-            if (tasks.Any(task => task.IsCanceled || task.IsFaulted))
+            var anyDependencyFailed = DependencyControls
+                .Select(control => control.Task)
+                .Any(task => task.IsCanceled || task.IsFaulted);
+
+            if (anyDependencyFailed)
                 Control.Cancel().ThrowIfCancellationRequested();
 
             foreach (var solutionPath in System.IO.Directory.GetFiles(Directory, "*.sln", SearchOption.AllDirectories))
